@@ -1,2 +1,3 @@
 # groc-list-smpl
-A simple grocery list app
+
+A simple grocery list app.
