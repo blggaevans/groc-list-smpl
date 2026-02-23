@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Lists: owner has full access; collaborators (by email) have full access
+    match /lists/{listId} {
+      allow read, update, delete: if request.auth != null && (
+        resource.data.ownerId == request.auth.uid ||
+        request.auth.token.email in resource.data.collaborators
+      );
+      allow create: if request.auth != null &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // Items: same access as the parent list
+      match /items/{itemId} {
+        allow read, write: if request.auth != null && (
+          get(/databases/$(database)/documents/lists/$(listId)).data.ownerId == request.auth.uid ||
+          request.auth.token.email in get(/databases/$(database)/documents/lists/$(listId)).data.collaborators
+        );
+      }
+    }
+
+    // Per-user item history (powers autocomplete) — private to each user
+    match /users/{userId}/itemHistory/{itemId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
