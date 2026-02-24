@@ -353,7 +353,7 @@ export default function ListDetail() {
       </header>
 
       {/* Content */}
-      <main className={`flex-1 px-4 py-3 max-w-lg mx-auto w-full ${isOwner && hasSections ? 'pb-20' : 'pb-6'}`}>
+      <main className="flex-1 px-4 py-3 max-w-lg mx-auto w-full pb-24">
         {items.length === 0 && (
           <p className="text-center text-gray-400 dark:text-gray-600 mt-16 text-sm">
             No items yet. Type below to add one.
@@ -425,52 +425,54 @@ export default function ListDetail() {
           </div>
         )}
 
-        {/* Add item input — sits below the last item */}
-        <div className="relative mt-3">
-          {/* Autocomplete suggestions — drops down below the input */}
-          {quickAddSuggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-lg z-10">
-              {quickAddSuggestions.map(s => (
-                <button
-                  key={s}
-                  className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 border-b last:border-b-0 border-gray-100 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-700"
-                  onMouseDown={e => {
-                    e.preventDefault()
-                    setQuickAddValue(s)
-                    setQuickAddSuggestions([])
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-          <input
-            ref={quickAddRef}
-            className="w-full bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none placeholder-gray-400"
-            placeholder="Add item…"
-            value={quickAddValue}
-            onChange={e => setQuickAddValue(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleQuickAdd()
-              if (e.key === 'Escape') { setQuickAddValue(''); setQuickAddSuggestions([]) }
-            }}
-          />
-        </div>
       </main>
 
-      {/* Sticky bottom add-section bar */}
-      {isOwner && hasSections && (
-        <div
-          className="fixed bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 px-4 py-3"
-          style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
-        >
-          <div className="max-w-lg mx-auto">
-            {addingSection ? (
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+      {/* Unified sticky bottom bar — add item + add section */}
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-4 py-3"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="max-w-lg mx-auto flex items-center gap-2">
+          {/* Add item input */}
+          <div className="flex-1 relative">
+            {/* Autocomplete suggestions — floats above */}
+            {quickAddSuggestions.length > 0 && (
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-lg">
+                {quickAddSuggestions.map(s => (
+                  <button
+                    key={s}
+                    className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 border-b last:border-b-0 border-gray-100 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-700"
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      setQuickAddValue(s)
+                      setQuickAddSuggestions([])
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            <input
+              ref={quickAddRef}
+              className="w-full bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none placeholder-gray-400"
+              placeholder="Add item…"
+              value={quickAddValue}
+              onChange={e => setQuickAddValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleQuickAdd()
+                if (e.key === 'Escape') { setQuickAddValue(''); setQuickAddSuggestions([]) }
+              }}
+            />
+          </div>
+
+          {/* Add section — green + or inline form */}
+          {isOwner && hasSections && (
+            addingSection ? (
+              <div className="flex items-center gap-1 flex-shrink-0">
                 <input
-                  className="flex-1 text-sm text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
-                  placeholder="Section name"
+                  className="w-28 bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-3.5 text-sm text-gray-900 dark:text-white outline-none placeholder-gray-400"
+                  placeholder="Section…"
                   value={newSectionName}
                   onChange={e => setNewSectionName(e.target.value)}
                   onKeyDown={e => {
@@ -479,21 +481,21 @@ export default function ListDetail() {
                   }}
                   autoFocus
                 />
-                <button onClick={addSection} className="text-green-600 text-sm font-medium px-2">Add</button>
-                <button onClick={() => { setAddingSection(false); setNewSectionName('') }} className="text-gray-400 text-sm px-2">Cancel</button>
+                <button onClick={addSection} className="text-green-600 text-sm font-medium px-2 py-3.5">Add</button>
+                <button onClick={() => { setAddingSection(false); setNewSectionName('') }} className="text-gray-400 text-sm py-3.5">Cancel</button>
               </div>
             ) : (
               <button
                 onClick={() => setAddingSection(true)}
-                className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-600 py-2 px-1"
+                className="flex-shrink-0 p-2 text-green-600 active:text-green-700"
+                aria-label="Add section"
               >
                 <PlusIcon />
-                Add section
               </button>
-            )}
-          </div>
+            )
+          )}
         </div>
-      )}
+      </div>
 
       {showShare && (
         <ShareModal listId={listId} list={list} onClose={() => setShowShare(false)} />
