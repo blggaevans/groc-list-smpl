@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   collection, addDoc, deleteDoc, doc, query,
@@ -19,17 +19,39 @@ export default function Lists() {
   const [editingName, setEditingName] = useState('')
   const [createError, setCreateError] = useState('')
 
+  // Hold latest results from each query so we can merge them on every update
+  const ownedRef = useRef([])
+  const sharedRef = useRef([])
+
+  function mergeLists() {
+    const seen = new Set()
+    const merged = [...ownedRef.current, ...sharedRef.current].filter(l => {
+      if (seen.has(l.id)) return false
+      seen.add(l.id)
+      return true
+    })
+    merged.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+    setLists(merged)
+  }
+
   useEffect(() => {
     if (!user) return
-    const q = query(collection(db, 'lists'), where('ownerId', '==', user.uid))
-    return onSnapshot(q, snap => {
-      const data = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
-      setLists(data)
-    }, err => {
-      console.error('Lists query error:', err)
-    })
+
+    // Query 1: lists the user owns
+    const ownedQ = query(collection(db, 'lists'), where('ownerId', '==', user.uid))
+    const unsubOwned = onSnapshot(ownedQ, snap => {
+      ownedRef.current = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      mergeLists()
+    }, err => console.error('Owned lists error:', err))
+
+    // Query 2: lists shared with the user (by their Google email)
+    const sharedQ = query(collection(db, 'lists'), where('collaborators', 'array-contains', user.email))
+    const unsubShared = onSnapshot(sharedQ, snap => {
+      sharedRef.current = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      mergeLists()
+    }, err => console.error('Shared lists error:', err))
+
+    return () => { unsubOwned(); unsubShared() }
   }, [user])
 
   async function createList() {
@@ -88,62 +110,82 @@ export default function Lists() {
           </p>
         )}
 
-        {lists.map(list => (
-          <div
-            key={list.id}
-            className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
-          >
-            {editingId === list.id ? (
-              <div className="flex items-center px-4 py-3.5 gap-2">
-                <input
-                  className="flex-1 text-base text-gray-900 dark:text-white bg-transparent outline-none"
-                  value={editingName}
-                  onChange={e => setEditingName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') saveRename(list.id)
-                    if (e.key === 'Escape') setEditingId(null)
-                  }}
-                  autoFocus
-                />
-                <button
-                  onClick={() => saveRename(list.id)}
-                  className="text-green-600 font-medium text-sm py-1 px-2"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setEditingId(null)}
-                  className="text-gray-400 text-sm py-1 px-2"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <button
-                  onClick={() => navigate(`/list/${list.id}`)}
-                  className="flex-1 text-left px-4 py-4 text-base font-medium text-gray-900 dark:text-white min-h-[56px]"
-                >
-                  {list.name}
-                </button>
-                <button
-                  onClick={() => { setEditingId(list.id); setEditingName(list.name) }}
-                  className="p-4 text-gray-400 dark:text-gray-600 active:text-gray-600 dark:active:text-gray-400"
-                  aria-label="Rename list"
-                >
-                  <PencilIcon />
-                </button>
-                <button
-                  onClick={() => deleteList(list.id)}
-                  className="p-4 text-gray-400 dark:text-gray-600 active:text-red-500"
-                  aria-label="Delete list"
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+        {lists.map(list => {
+          const isOwner = list.ownerId === user.uid
+
+          return (
+            <div
+              key={list.id}
+              className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+            >
+              {editingId === list.id ? (
+                <div className="flex items-center px-4 py-3.5 gap-2">
+                  <input
+                    className="flex-1 text-base text-gray-900 dark:text-white bg-transparent outline-none"
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') saveRename(list.id)
+                      if (e.key === 'Escape') setEditingId(null)
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => saveRename(list.id)}
+                    className="text-green-600 font-medium text-sm py-1 px-2"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="text-gray-400 text-sm py-1 px-2"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <button
+                    onClick={() => navigate(`/list/${list.id}`)}
+                    className="flex-1 text-left px-4 py-4 min-h-[56px]"
+                  >
+                    <span className="text-base font-medium text-gray-900 dark:text-white">
+                      {list.name}
+                    </span>
+                    {!isOwner && (
+                      <span className="ml-2 text-xs text-gray-400 dark:text-gray-600 font-normal">
+                        Shared
+                      </span>
+                    )}
+                  </button>
+
+                  {isOwner ? (
+                    <>
+                      <button
+                        onClick={() => { setEditingId(list.id); setEditingName(list.name) }}
+                        className="p-4 text-gray-400 dark:text-gray-600 active:text-gray-600 dark:active:text-gray-400"
+                        aria-label="Rename list"
+                      >
+                        <PencilIcon />
+                      </button>
+                      <button
+                        onClick={() => deleteList(list.id)}
+                        className="p-4 text-gray-400 dark:text-gray-600 active:text-red-500"
+                        aria-label="Delete list"
+                      >
+                        <TrashIcon />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="px-4 text-xs text-gray-300 dark:text-gray-700">
+                      collab
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {/* New list input */}
         {showInput && (
