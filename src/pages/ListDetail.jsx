@@ -47,6 +47,7 @@ export default function ListDetail() {
   const [quickAddValue, setQuickAddValue] = useState('')
   const [quickAddSuggestions, setQuickAddSuggestions] = useState([])
   const isDraggingRef = useRef(false)
+  const quickAddRef = useRef(null)
 
   const isOwner = list?.ownerId === user?.uid
 
@@ -143,6 +144,7 @@ export default function ListDetail() {
     if (!name) return
     setQuickAddValue('')
     setQuickAddSuggestions([])
+    quickAddRef.current?.focus()
     await addItem(name)
   }
 
@@ -444,6 +446,7 @@ export default function ListDetail() {
             </div>
           )}
           <input
+            ref={quickAddRef}
             className="w-full bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none placeholder-gray-400"
             placeholder="Add item…"
             value={quickAddValue}
