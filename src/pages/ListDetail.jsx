@@ -351,7 +351,7 @@ export default function ListDetail() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 px-4 py-3 max-w-lg mx-auto w-full pb-6">
+      <main className={`flex-1 px-4 py-3 max-w-lg mx-auto w-full ${isOwner && hasSections ? 'pb-20' : 'pb-6'}`}>
         {items.length === 0 && (
           <p className="text-center text-gray-400 dark:text-gray-600 mt-16 text-sm">
             No items yet. Type below to add one.
@@ -423,37 +423,6 @@ export default function ListDetail() {
           </div>
         )}
 
-        {/* Add section */}
-        {isOwner && hasSections && (
-          <div className="mt-4">
-            {addingSection ? (
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-                <input
-                  className="flex-1 text-sm text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
-                  placeholder="Section name"
-                  value={newSectionName}
-                  onChange={e => setNewSectionName(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') addSection()
-                    if (e.key === 'Escape') { setAddingSection(false); setNewSectionName('') }
-                  }}
-                  autoFocus
-                />
-                <button onClick={addSection} className="text-green-600 text-sm font-medium px-2">Add</button>
-                <button onClick={() => { setAddingSection(false); setNewSectionName('') }} className="text-gray-400 text-sm px-2">Cancel</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setAddingSection(true)}
-                className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-600 py-2 px-1"
-              >
-                <PlusIcon />
-                Add section
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Add item input — sits below the last item */}
         <div className="relative mt-3">
           {/* Autocomplete suggestions — drops down below the input */}
@@ -486,6 +455,42 @@ export default function ListDetail() {
           />
         </div>
       </main>
+
+      {/* Sticky bottom add-section bar */}
+      {isOwner && hasSections && (
+        <div
+          className="fixed bottom-0 left-0 right-0 bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 px-4 py-3"
+          style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        >
+          <div className="max-w-lg mx-auto">
+            {addingSection ? (
+              <div className="flex items-center gap-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+                <input
+                  className="flex-1 text-sm text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
+                  placeholder="Section name"
+                  value={newSectionName}
+                  onChange={e => setNewSectionName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') addSection()
+                    if (e.key === 'Escape') { setAddingSection(false); setNewSectionName('') }
+                  }}
+                  autoFocus
+                />
+                <button onClick={addSection} className="text-green-600 text-sm font-medium px-2">Add</button>
+                <button onClick={() => { setAddingSection(false); setNewSectionName('') }} className="text-gray-400 text-sm px-2">Cancel</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAddingSection(true)}
+                className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-600 py-2 px-1"
+              >
+                <PlusIcon />
+                Add section
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {showShare && (
         <ShareModal listId={listId} list={list} onClose={() => setShowShare(false)} />
