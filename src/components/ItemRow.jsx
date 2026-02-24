@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { CheckIcon, TrashIcon, DragHandleIcon } from './icons'
+import { useSettings } from '../contexts/SettingsContext'
 
 export default function ItemRow({ item, onToggle, onDelete, onUpdateNote, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false)
   const [noteInput, setNoteInput] = useState('')
+  const { settings } = useSettings()
+  const compact = settings.compactView
 
   const details = [item.quantity, item.weight, item.comment].filter(Boolean).join(' · ')
 
@@ -26,7 +29,7 @@ export default function ItemRow({ item, onToggle, onDelete, onUpdateNote, dragHa
         {dragHandleProps && (
           <button
             {...dragHandleProps}
-            className="pl-3 pr-1 py-4 text-gray-200 dark:text-gray-800 touch-none cursor-grab active:cursor-grabbing"
+            className={`pl-3 pr-1 ${compact ? 'py-2' : 'py-4'} text-gray-200 dark:text-gray-800 touch-none cursor-grab active:cursor-grabbing`}
             aria-label="Drag to reorder"
             tabIndex={-1}
           >
@@ -37,7 +40,7 @@ export default function ItemRow({ item, onToggle, onDelete, onUpdateNote, dragHa
         {/* Check circle */}
         <button
           onClick={onToggle}
-          className="pl-4 pr-2 py-4 flex-shrink-0"
+          className={`pl-4 pr-2 ${compact ? 'py-2' : 'py-4'} flex-shrink-0`}
           aria-label={item.checked ? 'Uncheck item' : 'Check item'}
         >
           <span
@@ -54,10 +57,10 @@ export default function ItemRow({ item, onToggle, onDelete, onUpdateNote, dragHa
         {/* Name + details — tap to add/edit a note */}
         <button
           onClick={handleExpand}
-          className="flex-1 flex flex-col min-w-0 px-2 py-4 text-left min-h-[56px] justify-center"
+          className={`flex-1 flex flex-col min-w-0 px-2 ${compact ? 'py-2 min-h-[40px]' : 'py-4 min-h-[56px]'} text-left justify-center`}
         >
           <span
-            className={`text-base leading-snug ${
+            className={`${compact ? 'text-sm' : 'text-base'} leading-snug ${
               item.checked
                 ? 'line-through text-gray-400 dark:text-gray-600'
                 : 'text-gray-900 dark:text-white'
@@ -75,7 +78,7 @@ export default function ItemRow({ item, onToggle, onDelete, onUpdateNote, dragHa
         {/* Delete */}
         <button
           onClick={onDelete}
-          className="px-4 py-4 text-gray-300 dark:text-gray-700 active:text-red-500 min-h-[56px] flex items-center"
+          className={`px-4 ${compact ? 'py-2 min-h-[40px]' : 'py-4 min-h-[56px]'} text-gray-300 dark:text-gray-700 active:text-red-500 flex items-center`}
           aria-label="Delete item"
         >
           <TrashIcon />

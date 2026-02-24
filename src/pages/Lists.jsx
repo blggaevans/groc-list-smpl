@@ -7,8 +7,9 @@ import {
 import { signOut } from 'firebase/auth'
 import { db, auth } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
-import { PencilIcon, TrashIcon } from '../components/icons'
+import { PencilIcon, TrashIcon, GearIcon } from '../components/icons'
 import { LIST_TYPES, buildDefaultSections, labelForType } from '../utils/sectionDefaults'
+import SettingsSheet from '../components/SettingsSheet'
 
 export default function Lists() {
   const user = useAuth()
@@ -20,6 +21,7 @@ export default function Lists() {
   const [editingId, setEditingId] = useState(null)
   const [editingName, setEditingName] = useState('')
   const [createError, setCreateError] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
 
   const ownedRef = useRef([])
   const sharedRef = useRef([])
@@ -99,12 +101,21 @@ export default function Lists() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <header className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">My Lists</h1>
-        <button
-          onClick={() => signOut(auth)}
-          className="text-sm text-gray-500 dark:text-gray-400 py-2 px-3 rounded-xl active:bg-gray-100 dark:active:bg-gray-800"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-2 text-gray-500 dark:text-gray-400 rounded-xl active:bg-gray-100 dark:active:bg-gray-800"
+            aria-label="Settings"
+          >
+            <GearIcon />
+          </button>
+          <button
+            onClick={() => signOut(auth)}
+            className="text-sm text-gray-500 dark:text-gray-400 py-2 px-3 rounded-xl active:bg-gray-100 dark:active:bg-gray-800"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       <main className="px-4 py-4 space-y-2 max-w-lg mx-auto w-full">
@@ -232,6 +243,8 @@ export default function Lists() {
           </button>
         )}
       </main>
+
+      {showSettings && <SettingsSheet onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
