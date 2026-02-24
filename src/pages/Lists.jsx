@@ -8,6 +8,7 @@ import { signOut } from 'firebase/auth'
 import { db, auth } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { PencilIcon, TrashIcon } from '../components/icons'
+import { LIST_TYPES, buildDefaultSections, labelForType } from '../utils/sectionDefaults'
 
 export default function Lists() {
   const user = useAuth()
@@ -15,11 +16,11 @@ export default function Lists() {
   const [lists, setLists] = useState([])
   const [showInput, setShowInput] = useState(false)
   const [newListName, setNewListName] = useState('')
+  const [newListType, setNewListType] = useState('grocery')
   const [editingId, setEditingId] = useState(null)
   const [editingName, setEditingName] = useState('')
   const [createError, setCreateError] = useState('')
 
-  // Hold latest results from each query so we can merge them on every update
   const ownedRef = useRef([])
   const sharedRef = useRef([])
 
@@ -36,15 +37,12 @@ export default function Lists() {
 
   useEffect(() => {
     if (!user) return
-
-    // Query 1: lists the user owns
     const ownedQ = query(collection(db, 'lists'), where('ownerId', '==', user.uid))
     const unsubOwned = onSnapshot(ownedQ, snap => {
       ownedRef.current = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       mergeLists()
     }, err => console.error('Owned lists error:', err))
 
-    // Query 2: lists shared with the user (by their Google email)
     const sharedQ = query(collection(db, 'lists'), where('collaborators', 'array-contains', user.email))
     const unsubShared = onSnapshot(sharedQ, snap => {
       sharedRef.current = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -53,6 +51,13 @@ export default function Lists() {
 
     return () => { unsubOwned(); unsubShared() }
   }, [user])
+
+  function resetCreateForm() {
+    setShowInput(false)
+    setNewListName('')
+    setNewListType('grocery')
+    setCreateError('')
+  }
 
   async function createList() {
     const name = newListName.trim()
@@ -65,14 +70,14 @@ export default function Lists() {
     try {
       await addDoc(collection(db, 'lists'), {
         name,
+        type: newListType,
+        sections: buildDefaultSections(newListType),
         ownerId: user.uid,
         collaborators: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
-      setNewListName('')
-      setShowInput(false)
-      setCreateError('')
+      resetCreateForm()
     } catch (err) {
       console.error('Failed to create list:', err)
       setCreateError(err.message)
@@ -92,7 +97,6 @@ export default function Lists() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {/* Header */}
       <header className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 px-4 py-4 flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">My Lists</h1>
         <button
@@ -112,7 +116,6 @@ export default function Lists() {
 
         {lists.map(list => {
           const isOwner = list.ownerId === user.uid
-
           return (
             <div
               key={list.id}
@@ -130,18 +133,8 @@ export default function Lists() {
                     }}
                     autoFocus
                   />
-                  <button
-                    onClick={() => saveRename(list.id)}
-                    className="text-green-600 font-medium text-sm py-1 px-2"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="text-gray-400 text-sm py-1 px-2"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={() => saveRename(list.id)} className="text-green-600 font-medium text-sm py-1 px-2">Save</button>
+                  <button onClick={() => setEditingId(null)} className="text-gray-400 text-sm py-1 px-2">Cancel</button>
                 </div>
               ) : (
                 <div className="flex items-center">
@@ -149,21 +142,17 @@ export default function Lists() {
                     onClick={() => navigate(`/list/${list.id}`)}
                     className="flex-1 text-left px-4 py-4 min-h-[56px]"
                   >
-                    <span className="text-base font-medium text-gray-900 dark:text-white">
-                      {list.name}
+                    <span className="text-base font-medium text-gray-900 dark:text-white">{list.name}</span>
+                    <span className="ml-2 text-xs text-gray-400 dark:text-gray-600">
+                      {list.type ? labelForType(list.type) : ''}
+                      {!isOwner && ' · Shared'}
                     </span>
-                    {!isOwner && (
-                      <span className="ml-2 text-xs text-gray-400 dark:text-gray-600 font-normal">
-                        Shared
-                      </span>
-                    )}
                   </button>
-
                   {isOwner ? (
                     <>
                       <button
                         onClick={() => { setEditingId(list.id); setEditingName(list.name) }}
-                        className="p-4 text-gray-400 dark:text-gray-600 active:text-gray-600 dark:active:text-gray-400"
+                        className="p-4 text-gray-400 dark:text-gray-600 active:text-gray-600"
                         aria-label="Rename list"
                       >
                         <PencilIcon />
@@ -177,9 +166,7 @@ export default function Lists() {
                       </button>
                     </>
                   ) : (
-                    <span className="px-4 text-xs text-gray-300 dark:text-gray-700">
-                      collab
-                    </span>
+                    <span className="px-4 text-xs text-gray-300 dark:text-gray-700">collab</span>
                   )}
                 </div>
               )}
@@ -187,29 +174,47 @@ export default function Lists() {
           )
         })}
 
-        {/* New list input */}
+        {/* New list form */}
         {showInput && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-3.5 flex items-center gap-2">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 px-4 py-4 space-y-3">
             <input
-              className="flex-1 text-base text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
+              className="w-full text-base text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
               placeholder="List name"
               value={newListName}
               onChange={e => { setNewListName(e.target.value); setCreateError('') }}
               onKeyDown={e => {
                 if (e.key === 'Enter') createList()
-                if (e.key === 'Escape') { setShowInput(false); setNewListName(''); setCreateError('') }
+                if (e.key === 'Escape') resetCreateForm()
               }}
               autoFocus
             />
-            <button onClick={createList} className="text-green-600 font-medium text-sm py-1 px-2">
-              Add
-            </button>
-            <button
-              onClick={() => { setShowInput(false); setNewListName(''); setCreateError('') }}
-              className="text-gray-400 text-sm py-1 px-2"
-            >
-              Cancel
-            </button>
+            {/* Type selector */}
+            <div className="flex flex-wrap gap-2">
+              {LIST_TYPES.map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => setNewListType(t.value)}
+                  className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                    newListType === t.value
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={createList}
+                className="flex-1 bg-green-600 text-white rounded-xl py-2.5 font-medium text-sm active:bg-green-700"
+              >
+                Create list
+              </button>
+              <button onClick={resetCreateForm} className="px-4 py-2.5 text-gray-400 text-sm">
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -217,7 +222,6 @@ export default function Lists() {
           <p className="text-red-500 text-sm px-1">{createError}</p>
         )}
 
-        {/* New list button */}
         {!showInput && (
           <button
             onClick={() => setShowInput(true)}
