@@ -134,7 +134,7 @@ export default function SectionGroup({
           {/* Inline add input for this section */}
           {isOwner && showSectionInput && (
             <div className="mt-1.5">
-              <div className="bg-white dark:bg-gray-900 rounded-2xl px-4 py-3 flex items-center gap-2">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl px-4 py-3 flex items-center gap-2 ring-2 ring-green-500">
                 <input
                   className="flex-1 text-sm text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
                   placeholder="Item name"
@@ -148,7 +148,7 @@ export default function SectionGroup({
                 />
                 <button
                   onClick={() => { setShowSectionInput(false); setSectionInputValue('') }}
-                  className="text-xs text-gray-400 dark:text-gray-600 px-1 py-1"
+                  className="text-xs text-green-600 font-medium px-1 py-1"
                 >
                   Done
                 </button>

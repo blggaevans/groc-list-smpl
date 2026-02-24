@@ -351,7 +351,7 @@ export default function ListDetail() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 px-4 py-3 max-w-lg mx-auto w-full pb-28">
+      <main className="flex-1 px-4 py-3 max-w-lg mx-auto w-full pb-6">
         {items.length === 0 && (
           <p className="text-center text-gray-400 dark:text-gray-600 mt-16 text-sm">
             No items yet. Type below to add one.
@@ -453,17 +453,12 @@ export default function ListDetail() {
             )}
           </div>
         )}
-      </main>
 
-      {/* Sticky bottom add bar */}
-      <div
-        className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-4 py-3"
-        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
-      >
-        <div className="relative max-w-lg mx-auto">
-          {/* Autocomplete suggestions — floats above the input */}
+        {/* Add item input — sits below the last item */}
+        <div className="relative mt-3">
+          {/* Autocomplete suggestions — drops down below the input */}
           {quickAddSuggestions.length > 0 && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-lg">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-lg z-10">
               {quickAddSuggestions.map(s => (
                 <button
                   key={s}
@@ -490,7 +485,7 @@ export default function ListDetail() {
             }}
           />
         </div>
-      </div>
+      </main>
 
       {showShare && (
         <ShareModal listId={listId} list={list} onClose={() => setShowShare(false)} />
