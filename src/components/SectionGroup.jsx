@@ -10,10 +10,14 @@ export default function SectionGroup({
   onToggleItem,
   onDeleteItem,
   onDeleteSection,
+  onAddToSection,
+  onUpdateNote,
   isOwner,
-  isOver,         // true when an item is being dragged over this section
+  isOver,
 }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [showSectionInput, setShowSectionInput] = useState(false)
+  const [sectionInputValue, setSectionInputValue] = useState('')
 
   const {
     attributes,
@@ -33,6 +37,20 @@ export default function SectionGroup({
   const unchecked = items.filter(i => !i.checked).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   const checked = items.filter(i => i.checked).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   const total = items.length
+
+  async function handleSectionAdd() {
+    const name = sectionInputValue.trim()
+    if (!name) { setShowSectionInput(false); return }
+    setSectionInputValue('')
+    await onAddToSection(name, '', section.id)
+    // Keep input open for rapid adding
+  }
+
+  function handlePlusClick() {
+    if (collapsed) setCollapsed(false)
+    setShowSectionInput(v => !v)
+    setSectionInputValue('')
+  }
 
   return (
     <div ref={setNodeRef} style={style} className="mb-4">
@@ -67,13 +85,24 @@ export default function SectionGroup({
         </button>
 
         {isOwner && (
-          <button
-            onClick={() => onDeleteSection(section.id)}
-            className="p-1 text-gray-300 dark:text-gray-700 active:text-red-400"
-            aria-label={`Delete ${section.name} section`}
-          >
-            <TrashIcon />
-          </button>
+          <>
+            {/* + button to add item directly to this section */}
+            <button
+              onClick={handlePlusClick}
+              className="p-1 text-gray-300 dark:text-gray-700 active:text-green-500"
+              aria-label={`Add item to ${section.name}`}
+            >
+              <PlusIcon />
+            </button>
+
+            <button
+              onClick={() => onDeleteSection(section.id)}
+              className="p-1 text-gray-300 dark:text-gray-700 active:text-red-400"
+              aria-label={`Delete ${section.name} section`}
+            >
+              <TrashIcon />
+            </button>
+          </>
         )}
       </div>
 
@@ -90,16 +119,42 @@ export default function SectionGroup({
                 item={item}
                 onToggle={() => onToggleItem(item.id, item.checked)}
                 onDelete={() => onDeleteItem(item.id)}
+                onUpdateNote={onUpdateNote}
               />
             ))}
 
-            {/* Drop zone shown when section is empty or item is being dragged over */}
-            {(unchecked.length === 0) && (
+            {/* Drop zone shown when section is empty */}
+            {unchecked.length === 0 && (
               <div className="h-12 rounded-2xl border-2 border-dashed border-gray-100 dark:border-gray-800 flex items-center justify-center">
                 <span className="text-xs text-gray-300 dark:text-gray-700">Drop items here</span>
               </div>
             )}
           </div>
+
+          {/* Inline add input for this section */}
+          {isOwner && showSectionInput && (
+            <div className="mt-1.5">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl px-4 py-3 flex items-center gap-2">
+                <input
+                  className="flex-1 text-sm text-gray-900 dark:text-white bg-transparent outline-none placeholder-gray-400"
+                  placeholder="Item name"
+                  value={sectionInputValue}
+                  onChange={e => setSectionInputValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSectionAdd()
+                    if (e.key === 'Escape') { setShowSectionInput(false); setSectionInputValue('') }
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={() => { setShowSectionInput(false); setSectionInputValue('') }}
+                  className="text-xs text-gray-400 dark:text-gray-600 px-1 py-1"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Checked items within section */}
           {checked.length > 0 && (
@@ -110,6 +165,7 @@ export default function SectionGroup({
                   item={item}
                   onToggle={() => onToggleItem(item.id, item.checked)}
                   onDelete={() => onDeleteItem(item.id)}
+                  onUpdateNote={onUpdateNote}
                 />
               ))}
             </div>

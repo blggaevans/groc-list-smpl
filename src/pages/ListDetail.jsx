@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
-  query, orderBy, onSnapshot, serverTimestamp, setDoc,
+  query, orderBy, limit, onSnapshot, serverTimestamp, setDoc,
 } from 'firebase/firestore'
 import {
   DndContext,
@@ -24,7 +24,6 @@ import { db } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
 import ItemRow from '../components/ItemRow'
 import SectionGroup from '../components/SectionGroup'
-import AddItemSheet from '../components/AddItemSheet'
 import ShareModal from '../components/ShareModal'
 import { BackIcon, ShareIcon, PlusIcon } from '../components/icons'
 import { autoAssignSection } from '../utils/autoAssign'
@@ -35,16 +34,18 @@ export default function ListDetail() {
   const navigate = useNavigate()
 
   const [list, setList] = useState(null)
-  const [sections, setSections] = useState([])      // ordered array from list.sections
-  const [items, setItems] = useState([])             // flat array from items subcollection
-  const [showAddSheet, setShowAddSheet] = useState(false)
+  const [sections, setSections] = useState([])
+  const [items, setItems] = useState([])
   const [showShare, setShowShare] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
-  const [activeId, setActiveId] = useState(null)     // id of dragged element
-  const [overSectionId, setOverSectionId] = useState(null) // section being hovered
+  const [activeId, setActiveId] = useState(null)
+  const [overSectionId, setOverSectionId] = useState(null)
   const [addingSection, setAddingSection] = useState(false)
   const [newSectionName, setNewSectionName] = useState('')
+  const [itemHistory, setItemHistory] = useState([])
+  const [quickAddValue, setQuickAddValue] = useState('')
+  const [quickAddSuggestions, setQuickAddSuggestions] = useState([])
   const isDraggingRef = useRef(false)
 
   const isOwner = list?.ownerId === user?.uid
@@ -73,6 +74,30 @@ export default function ListDetail() {
     })
   }, [listId])
 
+  // Load item history for autocomplete
+  useEffect(() => {
+    if (!user) return
+    const q = query(
+      collection(db, 'users', user.uid, 'itemHistory'),
+      orderBy('lastUsed', 'desc'),
+      limit(100),
+    )
+    return onSnapshot(q, snap => {
+      setItemHistory(snap.docs.map(d => d.data().name))
+    })
+  }, [user])
+
+  // Filter autocomplete suggestions as user types
+  useEffect(() => {
+    const trimmed = quickAddValue.trim().toLowerCase()
+    if (!trimmed) { setQuickAddSuggestions([]); return }
+    setQuickAddSuggestions(
+      itemHistory
+        .filter(h => h.toLowerCase().includes(trimmed) && h.toLowerCase() !== trimmed)
+        .slice(0, 5),
+    )
+  }, [quickAddValue, itemHistory])
+
   async function saveListName() {
     const name = nameInput.trim()
     if (!name || name === list?.name) { setEditingName(false); return }
@@ -80,13 +105,16 @@ export default function ListDetail() {
     setEditingName(false)
   }
 
-  async function addItem({ name, quantity, weight, comment }) {
-    const sectionId = autoAssignSection(name, list?.type, sections)
+  async function addItem(name, comment = '', targetSectionId = null) {
+    const sectionId = targetSectionId ?? autoAssignSection(name, list?.type, sections)
     const sectionItems = items.filter(i => i.sectionId === sectionId)
     const maxOrder = sectionItems.reduce((max, i) => Math.max(max, i.order ?? 0), 0)
 
     await addDoc(collection(db, 'lists', listId, 'items'), {
-      name, quantity, weight, comment,
+      name,
+      quantity: '',
+      weight: '',
+      comment,
       checked: false,
       sectionId,
       order: maxOrder + 1000,
@@ -103,6 +131,21 @@ export default function ListDetail() {
     )
   }
 
+  async function updateNote(itemId, comment) {
+    await updateDoc(doc(db, 'lists', listId, 'items', itemId), {
+      comment,
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  async function handleQuickAdd() {
+    const name = quickAddValue.trim()
+    if (!name) return
+    setQuickAddValue('')
+    setQuickAddSuggestions([])
+    await addItem(name)
+  }
+
   async function toggleItem(itemId, currentChecked) {
     await updateDoc(doc(db, 'lists', listId, 'items', itemId), {
       checked: !currentChecked,
@@ -115,7 +158,6 @@ export default function ListDetail() {
   }
 
   async function deleteSection(sectionId) {
-    // Move items in the deleted section to Uncategorized
     const fallback = sections.find(s => s.name.toLowerCase() === 'uncategorized')?.id
     const affected = items.filter(i => i.sectionId === sectionId)
     await Promise.all(affected.map(i =>
@@ -184,7 +226,6 @@ export default function ListDetail() {
     setOverSectionId(targetSectionId)
 
     if (targetSectionId !== activeItem.sectionId) {
-      // Optimistically move item to new section for smooth UI
       setItems(prev => prev.map(i =>
         i.id === activeItemId ? { ...i, sectionId: targetSectionId } : i,
       ))
@@ -235,7 +276,6 @@ export default function ListDetail() {
       if (overItem) targetSectionId = overItem.sectionId
     }
 
-    // Compute new order within target section
     const sectionItems = items
       .filter(i => i.sectionId === targetSectionId && !i.checked && i.id !== activeItemId)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -251,7 +291,6 @@ export default function ListDetail() {
       else if (!next) newOrder = (prev.order ?? 0) + 1000
       else newOrder = ((prev.order ?? 0) + (next.order ?? 0)) / 2
     } else if (overId.startsWith('section-')) {
-      // Dropped onto section header — put at end
       const last = sectionItems[sectionItems.length - 1]
       newOrder = last ? (last.order ?? 0) + 1000 : 1000
     }
@@ -263,12 +302,10 @@ export default function ListDetail() {
     })
   }
 
-  // The item currently being dragged (for DragOverlay)
   const activeItem = activeId?.startsWith('item-')
     ? items.find(i => i.id === activeId.replace('item-', ''))
     : null
 
-  // ── Fallback: no sections (old lists) ────────────────────────────────────
   const hasSections = sections.length > 0
 
   return (
@@ -317,7 +354,7 @@ export default function ListDetail() {
       <main className="flex-1 px-4 py-3 max-w-lg mx-auto w-full pb-28">
         {items.length === 0 && (
           <p className="text-center text-gray-400 dark:text-gray-600 mt-16 text-sm">
-            No items yet. Tap + to add one.
+            No items yet. Type below to add one.
           </p>
         )}
 
@@ -329,14 +366,12 @@ export default function ListDetail() {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
-            {/* Section order sortable context */}
             <SortableContext
               items={sections.map(s => `section-${s.id}`)}
               strategy={verticalListSortingStrategy}
             >
               {sections.map(section => {
                 const sectionItems = items.filter(i => i.sectionId === section.id)
-                // Hide empty sections unless a drag is in progress over them
                 if (sectionItems.length === 0 && overSectionId !== section.id && !isDraggingRef.current) {
                   return null
                 }
@@ -348,6 +383,8 @@ export default function ListDetail() {
                     onToggleItem={toggleItem}
                     onDeleteItem={deleteItem}
                     onDeleteSection={deleteSection}
+                    onAddToSection={addItem}
+                    onUpdateNote={updateNote}
                     isOwner={isOwner}
                     isOver={overSectionId === section.id}
                   />
@@ -355,7 +392,6 @@ export default function ListDetail() {
               })}
             </SortableContext>
 
-            {/* Drag overlay — renders the item being dragged */}
             <DragOverlay>
               {activeItem ? (
                 <div className="shadow-xl rounded-2xl opacity-95">
@@ -365,13 +401,24 @@ export default function ListDetail() {
             </DragOverlay>
           </DndContext>
         ) : (
-          // Fallback flat list for lists created before sections were added
           <div className="space-y-1.5">
             {items.filter(i => !i.checked).map(item => (
-              <ItemRow key={item.id} item={item} onToggle={() => toggleItem(item.id, item.checked)} onDelete={() => deleteItem(item.id)} />
+              <ItemRow
+                key={item.id}
+                item={item}
+                onToggle={() => toggleItem(item.id, item.checked)}
+                onDelete={() => deleteItem(item.id)}
+                onUpdateNote={updateNote}
+              />
             ))}
             {items.filter(i => i.checked).map(item => (
-              <ItemRow key={item.id} item={item} onToggle={() => toggleItem(item.id, item.checked)} onDelete={() => deleteItem(item.id)} />
+              <ItemRow
+                key={item.id}
+                item={item}
+                onToggle={() => toggleItem(item.id, item.checked)}
+                onDelete={() => deleteItem(item.id)}
+                onUpdateNote={updateNote}
+              />
             ))}
           </div>
         )}
@@ -408,27 +455,42 @@ export default function ListDetail() {
         )}
       </main>
 
-      {/* FAB */}
-      <div className="fixed bottom-6 right-6">
-        <button
-          onClick={() => setShowAddSheet(true)}
-          className="w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-          aria-label="Add item"
-        >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
+      {/* Sticky bottom add bar */}
+      <div
+        className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 px-4 py-3"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <div className="relative max-w-lg mx-auto">
+          {/* Autocomplete suggestions — floats above the input */}
+          {quickAddSuggestions.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-lg">
+              {quickAddSuggestions.map(s => (
+                <button
+                  key={s}
+                  className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-300 border-b last:border-b-0 border-gray-100 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-700"
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    setQuickAddValue(s)
+                    setQuickAddSuggestions([])
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            className="w-full bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3.5 text-base text-gray-900 dark:text-white outline-none placeholder-gray-400"
+            placeholder="Add item…"
+            value={quickAddValue}
+            onChange={e => setQuickAddValue(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleQuickAdd()
+              if (e.key === 'Escape') { setQuickAddValue(''); setQuickAddSuggestions([]) }
+            }}
+          />
+        </div>
       </div>
-
-      {showAddSheet && (
-        <AddItemSheet
-          userId={user.uid}
-          onAdd={async item => { await addItem(item) }}
-          onClose={() => setShowAddSheet(false)}
-        />
-      )}
 
       {showShare && (
         <ShareModal listId={listId} list={list} onClose={() => setShowShare(false)} />

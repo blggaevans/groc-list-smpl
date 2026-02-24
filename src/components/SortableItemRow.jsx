@@ -2,7 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ItemRow from './ItemRow'
 
-export default function SortableItemRow({ item, onToggle, onDelete }) {
+export default function SortableItemRow({ item, onToggle, onDelete, onUpdateNote }) {
   const {
     attributes,
     listeners,
@@ -25,6 +25,7 @@ export default function SortableItemRow({ item, onToggle, onDelete }) {
         item={item}
         onToggle={onToggle}
         onDelete={onDelete}
+        onUpdateNote={onUpdateNote}
         dragHandleProps={{ ...listeners, ...attributes }}
       />
     </div>

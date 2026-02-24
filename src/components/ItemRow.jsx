@@ -1,38 +1,61 @@
+import { useState } from 'react'
 import { CheckIcon, TrashIcon, DragHandleIcon } from './icons'
 
-export default function ItemRow({ item, onToggle, onDelete, dragHandleProps }) {
+export default function ItemRow({ item, onToggle, onDelete, onUpdateNote, dragHandleProps }) {
+  const [expanded, setExpanded] = useState(false)
+  const [noteInput, setNoteInput] = useState('')
+
   const details = [item.quantity, item.weight, item.comment].filter(Boolean).join(' · ')
 
-  return (
-    <div className="flex items-center bg-white dark:bg-gray-900 rounded-2xl overflow-hidden">
-      {/* Drag handle */}
-      {dragHandleProps && (
-        <button
-          {...dragHandleProps}
-          className="pl-3 pr-1 py-4 text-gray-200 dark:text-gray-800 touch-none cursor-grab active:cursor-grabbing"
-          aria-label="Drag to reorder"
-          tabIndex={-1}
-        >
-          <DragHandleIcon />
-        </button>
-      )}
+  function handleExpand() {
+    if (!expanded) {
+      setNoteInput(item.comment ?? '')
+      setExpanded(true)
+    }
+  }
 
-      {/* Check + name */}
-      <button
-        onClick={onToggle}
-        className="flex items-center flex-1 gap-3 px-4 py-4 text-left min-h-[56px]"
-        aria-label={item.checked ? 'Uncheck item' : 'Check item'}
-      >
-        <span
-          className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-            item.checked
-              ? 'bg-green-600 border-green-600'
-              : 'border-gray-300 dark:border-gray-600'
-          }`}
+  function saveNote() {
+    onUpdateNote?.(item.id, noteInput)
+    setExpanded(false)
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl overflow-hidden">
+      <div className="flex items-center">
+        {/* Drag handle */}
+        {dragHandleProps && (
+          <button
+            {...dragHandleProps}
+            className="pl-3 pr-1 py-4 text-gray-200 dark:text-gray-800 touch-none cursor-grab active:cursor-grabbing"
+            aria-label="Drag to reorder"
+            tabIndex={-1}
+          >
+            <DragHandleIcon />
+          </button>
+        )}
+
+        {/* Check circle */}
+        <button
+          onClick={onToggle}
+          className="pl-4 pr-2 py-4 flex-shrink-0"
+          aria-label={item.checked ? 'Uncheck item' : 'Check item'}
         >
-          {item.checked && <CheckIcon />}
-        </span>
-        <span className="flex flex-col min-w-0">
+          <span
+            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+              item.checked
+                ? 'bg-green-600 border-green-600'
+                : 'border-gray-300 dark:border-gray-600'
+            }`}
+          >
+            {item.checked && <CheckIcon />}
+          </span>
+        </button>
+
+        {/* Name + details — tap to add/edit a note */}
+        <button
+          onClick={handleExpand}
+          className="flex-1 flex flex-col min-w-0 px-2 py-4 text-left min-h-[56px] justify-center"
+        >
           <span
             className={`text-base leading-snug ${
               item.checked
@@ -47,17 +70,35 @@ export default function ItemRow({ item, onToggle, onDelete, dragHandleProps }) {
               {details}
             </span>
           )}
-        </span>
-      </button>
+        </button>
 
-      {/* Delete */}
-      <button
-        onClick={onDelete}
-        className="px-4 py-4 text-gray-300 dark:text-gray-700 active:text-red-500 min-h-[56px] flex items-center"
-        aria-label="Delete item"
-      >
-        <TrashIcon />
-      </button>
+        {/* Delete */}
+        <button
+          onClick={onDelete}
+          className="px-4 py-4 text-gray-300 dark:text-gray-700 active:text-red-500 min-h-[56px] flex items-center"
+          aria-label="Delete item"
+        >
+          <TrashIcon />
+        </button>
+      </div>
+
+      {/* Note editor — shown when item is tapped */}
+      {expanded && (
+        <div className="px-4 pb-3">
+          <input
+            className="w-full bg-gray-100 dark:bg-gray-800 rounded-xl px-3 py-2.5 text-sm text-gray-900 dark:text-white outline-none placeholder-gray-400"
+            placeholder="Add a note…"
+            value={noteInput}
+            onChange={e => setNoteInput(e.target.value)}
+            onBlur={saveNote}
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveNote()
+              if (e.key === 'Escape') setExpanded(false)
+            }}
+            autoFocus
+          />
+        </div>
+      )}
     </div>
   )
 }
